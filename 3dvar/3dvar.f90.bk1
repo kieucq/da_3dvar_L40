@@ -1,0 +1,359 @@
+!
+! NOTE:     
+!      This program performs a 3D var assimilation processes
+!      for the barotropic model (2D). The 3Dvar process will be 
+!      developed on each local patch to ease for the matrix inversion
+!      by my own method. This program is not optimized in computation
+!      and memory usage much. Need to re-think for real application.
+!      It sounds interesting from discussions with Takemasa that this
+!      simple approach has not been done before. Let's see how it works 
+!
+! HISTORY:  
+!    - Jan 19, 2009: Created  
+!
+! REFERENCE:
+!    - Kalnay, 2005: Book
+!    - Krishnamurti 1998: Numerical technique
+!
+! AUTHOR: 
+!      Chanh Q. Kieu, Research Associate
+!      Dept. of Atmospheric and Oceanic science
+!      Univ. of Maryland, College Park, MD
+!      email: kieucq@atmos.umd.edu
+!
+! COPYRIGHT: (C) 2009
+!
+!=================================================================
+!
+  program 3dvar
+  use common
+  use common_mtx
+  implicit none
+  integer, parameter          :: nx = 51,ny = 21     ! model domain size
+  integer, parameter          :: nv=nx*ny            ! vector 1D
+  integer, parameter          :: nxpatch = 10        ! number of local patch in x-direction
+  integer, parameter          :: nypatch = 5         ! number of local patch in y-direction
+  integer, parameter          :: no = nv             ! number of observations
+  real, dimension(nx,ny)      :: pf                  ! background (forecast) 
+  real, dimension(nx,ny)      :: pa                  ! analysis
+  real, dimension(no)         :: po                  ! observation data 
+  real, dimension(no)         :: olat,olon           ! observation lat and lon
+  real, dimension(nv)         :: xfm                 ! ensemble forecast mean vector
+  real, dimension(nv)         :: xam                 ! mean analysis vector
+  real, dimension(nv,nv)      :: B                   ! background error cov matrix
+  real, dimension(no,nv)      :: H                   ! observation operator
+  real, dimension(no,no)      :: R                   ! obs error cov matrix
+  real, dimension(no,no)      :: Rinv                ! R inverted
+  real, dimension(nv)         :: Xf                  ! matrix of ensemble pertrubation
+  real, dimension(nv)         :: Xa                  ! matrix of ensemble analysis perturbation   
+  real, dimension(no)         :: dx                  ! observation increments       
+  integer, allocatable        :: ip(:),jp(:)         ! local indexing 
+  real                        :: tem1(nx,ny)         ! temporate var
+  character*100               :: ifile,ofile         ! I/O files
+  integer                     :: i,j,i1,j1           ! indexing
+  integer                     :: debug               ! debuging
+  integer                     :: irec                ! output record
+  integer                     :: nxp,nyp             ! local ranges of each patch
+  integer                     :: nxr,nyr             ! ranges of the last patch
+  real                        :: bvar                ! background variance
+  real                        :: ovar                ! observation variance
+  real                        :: rscale              ! scale of background variance matrix
+  debug          = 2 
+  irec           = 1
+  bvar           = 1e7   
+  ovar           = 1e7
+  rscale         = 5.
+  open(92,file='3dvar.dat',access='direct',form='unformatted',recl=nx*ny*4)
+!
+! reading observation data
+!
+  open(90,file='obs.dat')
+  i              = 1
+2 continue
+  read(90,*,end=3)olon(i),olat(i),po(i)
+  if (debug.eq.1) print*,i,olon(i),olat(i),po(i)
+  i              = i + 1
+  if (i.le.no) goto 2
+  close(90)
+  goto 4
+3 print*,'There is not enough obs data as needed by no...stop'
+  stop
+4 continue
+  close(90)
+!
+! quick check of obs, only for no=nx*ny
+!
+  if (no.eq.nx*ny) then
+   call convert_vector_array1(po,no,tem1,nx,ny)
+   write(92,rec=irec)((tem1(i,j),i=1,nx),j=1,ny)
+   irec          = irec + 1
+  endif
+!
+! reading forecast (background) data
+!
+  ifile          = 'fsc.dat'
+  open(91,file=ifile)
+  read(91,'(6e13.6)')((pf(i,j),i=1,nx),j=1,ny)
+  write(92,rec=irec)((pf(i,j),i=1,nx),j=1,ny)
+  irec           = irec + 1
+  close(91)
+!
+! start to loop over the local patchs now.
+!
+  do i1          = 1,nxpatch
+   do j1         = 1,nypatch
+!
+! define the ranges of the local patch first
+!
+    if (i1.eq.nxpatch) then
+     nxp         = int(nx/nxpatch)
+    else
+     nxp         = int(nx/nxpatch) + mod(nx,nxpatch)
+    endif
+    if (j1.eq.nypatch) then
+     nyp         = int(ny/nypatch)
+    else
+     nyp         = int(ny/nypatch) + mod(ny,nypatch)
+    endif
+    if (debug.eq.1) print*,'Ranges of local patch are',i1,j1,nxp,nyp
+!
+! assign the indices for the local patch now
+!
+   
+
+!
+! convert from 2d array to a 1d vector 
+!
+    call convert_array_vector(pf,nx,ny,Xf,nv)
+!
+! prescribe the background error covariance matrix B
+!
+    call background_err_cov_mtx(B,nv,nx,ny,bvar,rscale)
+!
+! compute the observational operator
+!
+    call observation_operator(nx,ny,no,nv,olon,olat,H) 
+!
+! compute the observational error covariance matrix R
+!
+    call observational_err_cov_mtx(R,no,ovar)
+!
+! Invert R and stored in Rinv
+!
+    call compute_Rinv(R,Rinv,no)
+!
+! first guess for analysis
+!
+    Xa             = Xf
+
+
+
+
+!
+! compute observational increment
+!
+    call obs_increment(H,no,nv,xfm,po,ne,obs_inc)
+!
+! map the local analysis to the full range 1d vector
+!
+    call mapping_local_global()
+   enddo
+  enddo
+!
+! convert back from 1d vector to 2d array
+!
+  call convert_vector_array(Xa,nv,ne,pa,nx,ny)
+!
+! output analysis files
+!
+  ofile='ana00.dat'
+  nfile = 0
+9 continue
+  nfile = nfile + 1
+  if (nfile.le.9) then
+   write(ofile(5:5),'(1I1)')nfile
+  else
+   write(ofile(4:5),'(1I2)')nfile
+  endif
+  print*,'open output file is: ',ofile(1:20)
+  open(12,file=ofile,status='unknown')
+  write(12,'(6e13.6)')((pa(i,j,nfile),i=1,nx),j=1,ny)
+  write(92,rec=irec)((pa(i,j,nfile),i=1,nx),j=1,ny)
+  irec       = irec + 1
+  if (nfile.lt.ne) goto 9
+  print*,'ETKF finished safely...!'
+  end
+
+  subroutine observation_operator(nx,ny,no,nv,olon,olat,H)
+  implicit none
+  integer nx,ny,no,nv,i,j,m,n
+  real H(no,nv),olat(no),olon(no)
+  H         = 0.
+  i         = 1 
+10 continue
+  m         = int(olon(i)+0.001)
+  n         = int(olat(i)+0.001)
+  j         = (n-1)*nx + m
+  H(i,j)    = 1
+!  print*,i,olon(i),olat(i),j
+!  read*
+  i         = i + 1
+  if (i.le.no) goto 10
+  return
+  end
+
+  subroutine localiztion_operator(nx,ny,no,nv,olon,olat,lopt)
+  implicit none
+  integer nx,ny,no,nv,i,j,m,n
+  real lopt(nv,no),olat(no),olon(no),rscale,radi
+  rscale    = 10.
+  do i      = 1,nv
+   do j     = 1,no
+    m       = mod(i,nx)
+    n       = i/nx + 1
+    if (m.eq.0) then
+     m      = nx
+     n      = n - 1
+    endif
+    radi    = sqrt((olon(j)-m)**2. + (olat(j)-n)**2.)
+    lopt(i,j) = exp(-(radi/rscale)**2)
+   enddo
+  enddo
+  print*,'Checking Pat matrix'
+  do i       = 1,20
+   write(*,'(20F6.2)')(lopt(i,j),j=1,20)
+  enddo
+  return
+  end
+
+  subroutine background_err_cov_mtx(B,nv,nx,ny,bvar,rscale)
+  implicit none
+  integer nv,i,j,m,n,nx,ny
+  real B(nv,nv),rscale,radi,bvar
+  do i      = 1,nv
+   do j     = 1,nv
+    m       = mod(j,nx)
+    n       = j/nx + 1
+    if (m.eq.0) then
+     m      = nx
+     n      = n - 1
+    endif
+    radi    = sqrt((m-i)**2. + (n-i)**2.)
+    B(i,j)  = bvar*exp(-(radi/rscale)**2)
+   enddo
+  enddo
+  return
+  end
+
+  subroutine convert_array_vector(p,nx,ny,X,nv)
+  implicit none
+  integer nx,ny,ne,nv
+  real p(nx,ny),X(nv),,tem
+  integer i,j,k,m,n
+!
+! convert from an ensemble of 2D arrays to 1D vectors
+!
+  do i     = 1,nv
+   m       = mod(i,nx)
+   n       = i/nx + 1
+   if (m.eq.0) then
+    m      = nx
+    n      = n - 1
+   endif
+   X(i)  = p(m,n)
+  enddo
+  return
+  end
+
+  subroutine compute_Htilde(H,no,nv,Xf,ne,Ht)
+  implicit none
+  integer ne,nv,no
+  real H(no,nv),Xf(nv,ne),Ht(no,ne)
+  integer i,j,k,m,n
+  Ht       = matmul(H,Xf)
+  return
+  end
+
+  subroutine observational_err_cov_mtx(R,no,ovar)
+  implicit none
+  integer no,i
+  real R(no,no),obserr
+  R        = 0
+  do i     = 1,no
+   R(i,i)  = ovar**2
+  enddo
+  return
+  end
+
+
+  subroutine compute_Rinv(R,Rinv,no)
+  implicit none
+  integer no,i
+  real R(no,no),Rinv(no,no)
+  Rinv     = 0.
+  do i     = 1,no
+   Rinv(i,i) = 1/R(i,i)
+  enddo
+  return
+  end
+  
+  subroutine obs_increment(H,no,nv,xfm,po,ne,obs_inc)
+  implicit none
+  integer no,ne,nv
+  real H(no,nv),xfm(nv),po(no),obs_inc(nv)
+  real tem
+  integer i,j
+  do i     = 1,no
+   tem     = 0.
+   do j    = 1,nv
+    tem    = tem + H(i,j)*xfm(j)
+   enddo
+   obs_inc(i) = po(i) - tem
+  enddo
+  return
+  end
+
+  subroutine analysis_mean(K,lopt,nv,no,xfm,obs_inc,xam)
+  implicit none
+  integer no,nv
+  real K(nv,no),xfm(nv),obs_inc(no),xam(nv),lopt(nv,no)
+  integer i,j
+  do i     = 1,nv
+   xam(i)  = xfm(i)
+   do j    = 1,no
+    xam(i) = xam(i) + lopt(i,j)*K(i,j)*obs_inc(j)
+   enddo
+  enddo
+  return
+  end
+
+  subroutine convert_vector_array(Xa,nv,ne,pa,nx,ny)
+  implicit none
+  integer ne,nv,nx,ny
+  real Xa(nv,ne),pa(nx,ny,ne)
+  integer i,j,k,m,n
+  do k    = 1,ne
+   do i   = 1,nx
+    do j  = 1,ny
+     m    = (j-1)*nx + i
+     pa(i,j,k)  = Xa(m,k)
+    enddo
+   enddo
+  enddo
+  return
+  end
+
+  subroutine convert_vector_array1(Xa,nv,pa,nx,ny)
+  implicit none
+  integer nv,nx,ny
+  real Xa(nv),pa(nx,ny)
+  integer i,j,k,m,n
+  do i    = 1,nx
+   do j   = 1,ny
+    m     = (j-1)*nx + i
+    pa(i,j)  = Xa(m)
+   enddo
+  enddo
+  return
+  end
+

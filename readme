@@ -1,0 +1,21 @@
+1. ini: dir that contains a cold start initialization for an ensemble of
+        initital inputs
+
+2. truth: dir that contains an truth created from a base run of the baro model.
+        This program will use an initial input and integrate the model with 
+        time, output at some regular interval as the truth benchmark.
+
+
+3. obs: dir contains the obs data that are created by running obs.exe. This 
+        program will read the truth and add some perturbed white noise to
+        the truth to mimic the real obs.
+
+4. model: contains the barotropic model
+
+
+5. etkf: contains the assimilation code that performs a data assimilation
+        process.
+
+6. ana: contains the analysis backup
+
+7. fsc: contains the forecast for each cycle.
