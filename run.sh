@@ -18,7 +18,7 @@ ncycle=21
 npair=0
 nensemble=$((2*$npair+1))
 ninterval=50
-cold_start="F"
+cold_start="T"
 echo "SUMMARY OF ETKF CONFIGURATION"
 echo "==========================================================="
 echo " Number of cycles that the script will run is    : $ncycle"
