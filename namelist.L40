@@ -1,5 +1,0 @@
-debug       = 0               ! debuging level
-restart     = 50              ! reatart inteval for assimilation 
-F           = 8.0             ! forcing of the L40 model 
-dt          = 1.0e-2          ! time step
-

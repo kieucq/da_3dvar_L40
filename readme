@@ -6,11 +6,15 @@ as it is not for the commercial purposes.
 
 REMARK:
 1. The system only supports PGI/Intel Fortran compiler at the moment. For
-        MPI run, only PGI is supported.
+   MPI run, only PGI is supported.
 2. Only a certain type of OSSE designs are supported (see obs/obs.f90)
 3. Intel fortram compiler has a much longer runtime as compared to PGI!!!
 4. The cost function minimizer employs an external lib for the conjugate
    gradient method.
+5. The code is hardwired with a fixed 1000 step integration, obs err = 0.1
+   bgd err = 0.3, number of obs = 40, and 21 DA cycles. Need to learn how to 
+   adjust these parameters as a part of learning the code instead of running 
+   it like a black box.
 
 AUTH: Chanh Kieu, emai: ckieu@iu.edu. Tel: 812-856-5704 (C)
 
@@ -21,7 +25,7 @@ INSTALLATION:
         files. Any missing executable files would give an error message.
 
 HOW TO RUN:
-1. Edit run.sh to choose the options for DA cycling settings as well
+1. cd run and edit run.sh to choose the options for DA cycling settings as well
         as 3DVAR namelist configuration
 3. Run: sh ./run.sh
 3. Go to "ana" and check some diagnostic analysis (see, e.g., ana.txt or
@@ -43,8 +47,8 @@ DIR STRUCTURE
 4. model: contains the barotropic model
 
 
-5. etkf: contains the assimilation code that performs a data assimilation
-        process.
+5. 3dvar: contains the assimilation code that performs a data assimilation
+        process using 3DVAR.
 
 6. ana: contains the analysis backup
 

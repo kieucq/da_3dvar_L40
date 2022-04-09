@@ -48,7 +48,6 @@
 !
     OPEN(10,file='ctl.dat',FORM='UNFORMATTED',ACCESS='DIRECT',RECL=N*4)
     OPEN(11,file='namelist.L40')
-    OPEN(12,file='fsc_ctl.dat')
 !
 ! reading namelist of model parameters
 !
@@ -56,16 +55,16 @@
     READ(11,*)temc,temc,restart
     READ(11,*)temc,temc,F
     READ(11,*)temc,temc,dt
+    DO i = 1,40
+      READ(11,*)temc,temc,x(i,1)
+    ENDDO
+    x(8,1)  = x(8,1) + 0.1
+    x(18,1) = x(18,1)+ 0.03
     PRINT*,'Reading input namelist and returns'
     PRINT*,'debug      = ',debug
     PRINT*,'restart    = ',restart
     PRINT*,'F          = ',F
     PRINT*,'dt         = ',dt
-    READ*
-!
-! reading the input cold start data
-!
-    read(12,*)(x(i,1),i=1,N)
 !
 ! write out first input
 !

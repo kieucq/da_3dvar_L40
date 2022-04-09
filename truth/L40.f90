@@ -42,21 +42,29 @@
     INTEGER                 :: debug                ! debuging 
     INTEGER                 :: restart              ! restart inverval
     CHARACTER*100           :: ofile                ! output restart
+    CHARACTER               :: temc
 !
 ! open output file for plotting
 !
     OPEN(10,FILE='truth.dat',FORM='UNFORMATTED',ACCESS='DIRECT',RECL=N*4)
+    OPEN(11,file='namelist.L40')
+!
+! reading namelist of model parameters
+!
+    READ(11,*)temc,temc,debug
+    READ(11,*)temc,temc,restart
+    READ(11,*)temc,temc,F
+    READ(11,*)temc,temc,dt
+    DO i = 1,40
+      READ(11,*)temc,temc,x(i,1)
+    ENDDO
+    !x(:,1)      = 0.
+    !x(8,1)      = 0.1
+    !x(18,1)     = 0.2
 !
 ! assign initial condition and some model parameters
 !
-    debug       = 0
     irec        = 1
-    restart     = 50
-    F           = 8.0
-    dt          = 0.01
-    x(:,1)      = 0.
-    x(8,1)      = 0.1
-    x(18,1)     = 0.2
     ofile      ='./truth0000.dat'
     OPEN(80,file=ofile)
     WRITE(80,*)(x(i,1),i=1,N)
